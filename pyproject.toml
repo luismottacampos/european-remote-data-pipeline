@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "european-remote"
+dynamic = ["version"]
+description = 'European Remote Email Extractor'
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Luis Motta Campos", email = "1871839+luismottacampos@users.noreply.github.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "beautifulsoup4 >= 4.15",
+]
+
+[project.urls]
+Documentation = "https://github.com/Luis Motta Campos/european-remote#readme"
+Issues = "https://github.com/Luis Motta Campos/european-remote/issues"
+Source = "https://github.com/Luis Motta Campos/european-remote"
+
+[tool.hatch.version]
+path = "src/european_remote/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/european_remote tests}"
+
+[tool.coverage.run]
+source_pkgs = ["european_remote", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/european_remote/__about__.py",
+]
+
+[tool.coverage.paths]
+european_remote = ["src/european_remote", "*/european-remote/src/european_remote"]
+tests = ["tests", "*/european-remote/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
