@@ -1,8 +1,8 @@
 import sys
-import io
 import re
 import email.parser
 import email.message
+import json
 
 from bs4 import BeautifulSoup
 
@@ -27,5 +27,4 @@ jobs = [
     for link in soup.css.select("li a")
 ]
 
-from pprint import pprint
-pprint(jobs)
+json.dump(obj=jobs, fp=sys.stdout)
