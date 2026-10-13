@@ -10,6 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/european_remote/extractor.py",
             "console": "integratedTerminal",
+            "args": ["<", "${workspaceFolder}/sample.eml"],
         }
     ]
 }
