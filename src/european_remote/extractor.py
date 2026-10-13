@@ -6,11 +6,6 @@ import email.message
 
 from bs4 import BeautifulSoup
 
-
-# filename:str = "sample.eml"
-# with io.open(filename, mode="rb") as fh:
-#     m:email.message.Message = email.parser.BytesParser().parse(fh)
-
 m:email.message.Message = email.parser.BytesParser().parse(sys.stdin.buffer)
 
 if m.is_multipart():
@@ -25,10 +20,9 @@ employer_re = re.compile(r'\(at (?P<employer>[^\)]+)\)')
 jobs = [
     {
         "url": link['href'],
-        "title": link.span.string,
-        "raw_employer": (raw := link.span.next_sibling.next_sibling.string),
-        "employer": mo.group("employer") if (mo := employer_re.search(raw)) else None,
-
+        "raw_title": link.span.string,
+        "raw_employer": (raw_employer := link.span.next_sibling.next_sibling.string),
+        "employer": mo.group("employer") if (mo := employer_re.search(raw_employer)) else None,
     }
     for link in soup.css.select("li a")
 ]
