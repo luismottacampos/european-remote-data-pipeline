@@ -11,6 +11,14 @@
             "program": "${workspaceFolder}/src/european_remote/extractor.py",
             "console": "integratedTerminal",
             "args": ["<", "${workspaceFolder}/sample.eml"],
+        },
+        {
+            "name": "Fetcher with STDIN Sample",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/european_remote/fetcher.py",
+            "console": "integratedTerminal",
+            "args": ["<", "${workspaceFolder}/sample.json"],
         }
     ]
 }
