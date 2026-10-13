@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "european-remote"
-dynamic = ["version"]
+version = "0.0.1"
 description = 'European Remote Email Extractor'
 readme = "README.md"
 requires-python = ">=3.14"
@@ -29,17 +29,15 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/Luis Motta Campos/european-remote#readme"
-Issues = "https://github.com/Luis Motta Campos/european-remote/issues"
-Source = "https://github.com/Luis Motta Campos/european-remote"
-
-[tool.hatch.version]
-path = "src/european_remote/__about__.py"
+Documentation = "https://github.com/luismottacampos/european-remote#readme"
+Issues = "https://github.com/luismottacampos/european-remote/issues"
+Source = "https://github.com/luismottacampos/european-remote"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
+
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/european_remote tests}"
 
