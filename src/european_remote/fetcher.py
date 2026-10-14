@@ -1,32 +1,75 @@
 import sys
 import json
 import re
-from typing import Any, Pattern, Dict
+from functools import cache
+from typing import Any, Pattern, Dict, Tuple
 import requests
 
-class GreenhouseJobFetcher:
+from pprint import pprint
+
+
+class JobFetcher:
+    """
+    One JobFetcher to rule them all, one object to find them,
+    One Parent Class to bring them all and in the source-code bind them
+    In the Land of Web-Scrapping where the Data lie.
+    """
+
+    def __init__(self, session: requests.Session | None = None) -> None:
+        """
+        Common initialisations to all JobFetcher subclasses.
+        """
+        self.session = session or requests.Session()
+
+    @cache
+    def parse_url(self, url:str) -> Tuple[str, str]:
+        """
+        Parse a job-post URL.
+        :return: a tuple with the job's board and ID.
+        :raise: ValueError if the URL is invalid.
+        """
+        raise NotImplementedError('Must be overriden by the specialised class')
+
+    @cache
+    def fetch(self, url:str) -> Dict[str, Any]:
+        """
+        Fetch the job post data through the appropriate API.
+        :return: an object representing the data retrieved.
+        :raise: HTTPError, as required.
+        """
+        raise NotImplementedError("Must be overriden by the specialised class")
+
+
+class GreenhouseJobFetcher(JobFetcher):
     """
     Fetches job data from GreenHouse.io's API.
 
     Reference: https://docs.greenhouse.io/job-board.html#retrieve-a-job
     """
     JOB_POST_URL_TEMPLATE = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}"
+    URL_RE: Pattern[str] = re.compile(
+        r'https?://job-boards\.greenhouse\.io/(?P<board_token>[^/]+)/jobs/(?P<job_id>\d+)'
+    )
+
+    # Mnemonic: (board, ID) => { job_title: '...', job_desc: '...', ...}
+    _cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
     def __init__(self, session: requests.Session | None = None) -> None:
-        self.session = session or requests.Session()
-        self.url_re: Pattern[str] = re.compile(
-            r'https?://job-boards\.greenhouse\.io/(?P<board_token>[^/]+)/jobs/(?P<job_id>\d+)'
-        )
+        super().__init__(session=session)   
 
-    def _parse_url(self, url: str) -> tuple[str, str]:
+    @cache
+    def parse_url(self, url: str) -> Tuple[str, str]:
         """Parse a GreenHouse.io URL into (board_token, job_id)."""
-        if mo := self.url_re.search(url):
+        if mo := self.URL_RE.search(url):
             return mo.group("board_token"), mo.group("job_id")
         raise ValueError(f"Invalid GreenHouse.io URL: {url}")
 
-    def retrieve_greenhouse_job(self, url: str) -> dict[str, Any]:
-        """Fetch a job posting from GreenHouse.io by its public URL."""
-        board_token, job_id = self._parse_url(url)
+    @cache
+    def fetch(self, url: str) -> Dict[str, Any]:
+        """
+        Fetch a job posting from GreenHouse.io by its public URL.
+        """
+        board_token, job_id = self.parse_url(url)
         job_post_url = self.JOB_POST_URL_TEMPLATE.format(
             board_token=board_token, job_id=job_id
         )
@@ -34,45 +77,72 @@ class GreenhouseJobFetcher:
         response.raise_for_status()
         return response.json()
 
-class AshbyHQJobFetcher:
+
+class AshbyHQJobFetcher(JobFetcher):
     """
     Retrieves jobs from AshbyHQ.
     Ashby only allows retrieving full boards, so we need to cache each board's data when we first retrieve it.
     """
     JOB_BOARD_API_URL_PATTERN = "https://api.ashbyhq.com/posting-api/job-board/{board_name}?includeCompensation=true"
+    URL_RE: Pattern[str] = re.compile(
+        r'https\:\/\/jobs\.ashbyhq\.com\/(?P<board_name>[^\/]+)/(?P<job_id>[0-9a-f-]+)'
+    )
 
     def __init__(self, session: requests.Session | None = None) -> None:
-        self.session = session or requests.Session()
-        self.url_re: Pattern[str] = re.compile(
-            r'https\:\/\/jobs\.ashbyhq\.com\/(?<board_name>[^\/]+)/(?<job_id>[0-9a-f-]+)'
-        )
-        self.board_cache = {}
+        super().__init__(session=session)
 
-    def _parse_url(self, url:str) -> tuple[str, str]:
+    @cache
+    def parse_url(self, url:str) -> tuple[str, str]:
         """
         Parse an AshbyHQ URL into (board_name, job_id).
         :return: a tuple with the board name and job id.
         :raise: ValueError for invalid URLs.
         """
-        if mo := self.url_re.search(url):
+        if mo := self.URL_RE.search(url):
             return mo.group("board_name"), mo.group("job_id")
         raise ValueError(f"Invalid AshbyHQ URL: {url}")
 
-    def _retrieve_cached_board(self, board_name:str):
+    @cache
+    def _board(self, board_token:str) -> Dict[str,Any]:
         """
-        Checks a board with the given name is cached and returns it.
-        Cache misses trigger a fetch from AshbyHQ.
-        :returns: a dictionary representing the job board.
-        :raise: ValueError if retrieval goes wrong.
-        """
-        if board_name in self.board_cache:
-            return self.board_cache[board_name]
+        Retrieves a job board from Ashby's public API and returns it.
 
-        board_url = self.JOB_BOARD_API_URL_PATTERN.format(board_name=board_name)
+        :returns: a dictionary representing the job board.
+        :raise: HTTPError if retrieval goes wrong.
+        """
+        board_url = self.JOB_BOARD_API_URL_PATTERN.format(board_name=board_token)
         response = self.session.get(board_url)
         response.raise_for_status()
-        self.board_cache[board_name] = response.json()
-        return self.board_cache[board_name]
 
-for job in json.load(sys.stdin.buffer):
-    print(job.get("url", None))
+        return {
+            job['id']: {
+                'id': job['id'],
+                'url': job['jobUrl'],
+                'department': job['department'],
+                'team': job['team'],
+                'title': job['title'],
+                'description': job['descriptionPlain'],
+            }
+            for job in dict(response.json()).get('jobs', [])
+        }
+
+    @cache
+    def fetch(self, url:str) -> Dict[str, Any]:
+        """
+        Fetch a job posting from AshbyHQ.com by its public URL.
+        """
+        board_token, job_id = self.parse_url(url=url)
+        return self._board(board_token=board_token).get(job_id, {})
+
+# fetcher = GreenhouseJobFetcher()
+# j = fetcher.fetch(url="https://job-boards.greenhouse.io/canonical/jobs/6635671")
+
+fetcher = AshbyHQJobFetcher()
+j = fetcher.fetch(url="https://jobs.ashbyhq.com/duck-duck-go/80797cf4-64b2-4e94-9d87-6f2ecc45c862")
+
+pprint(j)
+
+# for job in json.load(sys.stdin.buffer):
+#     print(job.get("url", None))
+
+
