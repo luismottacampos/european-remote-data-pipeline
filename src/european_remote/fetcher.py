@@ -82,7 +82,6 @@ class GreenhouseJobFetcher(JobFetcher):
             'id': data.get('id'),
             'url': data.get('absolute_url'),
             'department': next((d.get('name') for d in data.get('departments', []) if isinstance(d, dict)), None),
-            'team': "", # Greenhouse does not have thsi field
             'title': data.get('title'),
             'description': html.unescape(data['content']),
             'published_at': datetime.fromisoformat(data['first_published'].replace(' ', '')),
@@ -133,6 +132,7 @@ class AshbyHQJobFetcher(JobFetcher):
                 'team': job['team'],
                 'title': job['title'],
                 'description': job['descriptionPlain'],
+                'published_at': datetime.fromisoformat(job['publishedAt'].replace(' ', '')),
             }
             for job in dict(response.json()).get('jobs', [])
         }
