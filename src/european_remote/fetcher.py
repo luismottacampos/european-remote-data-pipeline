@@ -1,9 +1,11 @@
 import sys
 import json
 import re
+from datetime import datetime
 from functools import cache
 from typing import Any, Pattern, Dict, Tuple
 import requests
+import html
 
 from pprint import pprint
 
@@ -75,8 +77,17 @@ class GreenhouseJobFetcher(JobFetcher):
         )
         response = self.session.get(job_post_url)
         response.raise_for_status()
-        return response.json()
-
+        data = dict(response.json())
+        return {
+            'id': data.get('id'),
+            'url': data.get('absolute_url'),
+            'department': next((d.get('name') for d in data.get('departments', []) if isinstance(d, dict)), None),
+            'team': "", # Greenhouse does not have thsi field
+            'title': data.get('title'),
+            'description': html.unescape(data['content']),
+            'published_at': datetime.fromisoformat(data['first_published'].replace(' ', '')),
+            'updated_at': datetime.fromisoformat(data['updated_at'].replace(' ', '')),
+        }
 
 class AshbyHQJobFetcher(JobFetcher):
     """
