@@ -1,13 +1,11 @@
 import sys
-import json
 import re
+import json
 from datetime import datetime
 from functools import cache
 from typing import Any, Pattern, Dict, Tuple
 import requests
 import html
-
-from pprint import pprint
 
 
 class JobFetcher:
@@ -50,11 +48,8 @@ class GreenhouseJobFetcher(JobFetcher):
     """
     JOB_POST_URL_TEMPLATE = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}"
     URL_RE: Pattern[str] = re.compile(
-        r'https?://job-boards\.greenhouse\.io/(?P<board_token>[^/]+)/jobs/(?P<job_id>\d+)'
+        r'https://job-boards\.greenhouse\.io/(?P<board_token>[^/]+)/jobs/(?P<job_id>\d+)'
     )
-
-    # Mnemonic: (board, ID) => { job_title: '...', job_desc: '...', ...}
-    _cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
     def __init__(self, session: requests.Session | None = None) -> None:
         super().__init__(session=session)   
@@ -145,15 +140,20 @@ class AshbyHQJobFetcher(JobFetcher):
         board_token, job_id = self.parse_url(url=url)
         return self._board(board_token=board_token).get(job_id, {})
 
-# fetcher = GreenhouseJobFetcher()
-# j = fetcher.fetch(url="https://job-boards.greenhouse.io/canonical/jobs/6635671")
 
-fetcher = AshbyHQJobFetcher()
-j = fetcher.fetch(url="https://jobs.ashbyhq.com/duck-duck-go/80797cf4-64b2-4e94-9d87-6f2ecc45c862")
-
-pprint(j)
-
-# for job in json.load(sys.stdin.buffer):
-#     print(job.get("url", None))
-
-
+for job in json.load(sys.stdin.buffer):
+    match job:
+        case {'url': url} if url.startswith('https://job-boards.greenhouse.io/'):
+            print(f'Greenhouse Board: {url}')
+        case {'url': url} if url.startswith('https://www.mongodb.com/careers/job/'):
+            print(f'MongoDB Careers by Greenhouse: {url}')
+        case {'url': url} if url.startswith('https://jobs.ashbyhq.com/'):
+            print(f'AshbyHQ Board: {url}')
+        case {'url': url} if url.startswith('https://careers.datadoghq.com/'):
+            print(f'DatadogHQ by Greenhouse: {url}')
+        case {'url': url} if url.startswith('https://apply.workable.com/j/'):
+            print(f'Workable job board: {url}')
+        case {'url': url}:
+            print(f'UNIDENTIFIED: {url}')
+        case _:
+            continue
