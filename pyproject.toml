@@ -34,6 +34,10 @@ Documentation = "https://github.com/luismottacampos/european-remote#readme"
 Issues = "https://github.com/luismottacampos/european-remote/issues"
 Source = "https://github.com/luismottacampos/european-remote"
 
+[tool.hatch.envs.default.scripts]
+extractor = "python src/european_remote/extractor.py"
+fetcher = "python src/european_remote/fetcher.py"
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
