@@ -2,7 +2,9 @@ import json
 import logging
 import requests
 import sys
+import time
 
+from random import uniform
 from requests import HTTPError
 
 # FIXME accept logging configuraiton parameters
@@ -14,6 +16,12 @@ logging.basicConfig(
 
 logger = logging.getLogger()
 
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+}
+
 def add_raw_content(job:dict, session:requests.Session) -> dict:
     """
     :return: a string representing the page fetched from the URL (hopefully 
@@ -22,14 +30,14 @@ def add_raw_content(job:dict, session:requests.Session) -> dict:
     """
     try:
         logger.info("Processing job '%s' (%s)...", job.get("raw_title"), job.get("url"))
-        response = session.get(str(job.get("url")))
+        response = session.get(url=str(job.get("url")))
         response.raise_for_status()
 
         job["raw_content"] = response.content.decode(
             encoding=response.encoding or 'utf-8')
         logger.info("\tadded %d bytes to raw_content.", len(job["raw_content"]))
     except HTTPError as e:
-        job["errors"] = job.get("errors", []).append(str(e))
+        job["errors"] = job.get("errors", []).append(str(e)) + [str(e)]
         logger.warning(
             "'%s' while trying to enrich job '%s' (%s).",
             str(e), job.get("raw_title", "No Title"), job.get("url", "No URL")
@@ -37,6 +45,12 @@ def add_raw_content(job:dict, session:requests.Session) -> dict:
     return job
 
 session = requests.Session()
-jobs = [add_raw_content(job, session) for job in json.load(sys.stdin.buffer)]
+session.headers.update(HEADERS)
+
+jobs = json.load(sys.stdin.buffer)
+for i, job in enumerate(jobs):
+    if i > 0:
+        time.sleep(uniform(0.5, 2.0))
+    job[i] = add_raw_content(job, session)
 
 json.dump(obj=jobs, fp=sys.stdout)
