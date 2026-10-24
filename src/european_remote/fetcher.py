@@ -3,9 +3,7 @@ import logging
 import requests
 import sys
 
-from pprint import pprint
-
-from redirect_resolver import RedirectResolver
+from requests import HTTPError
 
 # FIXME accept logging configuraiton parameters
 logging.basicConfig(
@@ -14,29 +12,31 @@ logging.basicConfig(
     stream=sys.stderr
 )
 
-
 logger = logging.getLogger()
-resolver = RedirectResolver()
 
-def resolve_job_urls(jobs, resolver=RedirectResolver()):
-    for job in jobs:
-        logger.info("Processing %s...", job['url'])
-        direct_url = None
-        if 'url' in job:
-            try:
-                direct_url = resolver.resolve(job['url'])
-            except requests.HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
-                    logger.warning("Job %s is no longer available. Ignoring.", job['url'])
-                else:
-                    raise
-            if direct_url is not None and job['url'] != direct_url:
-                logger.info("'%s' transformed into '%s'.", job['url'], direct_url)
-        else:
-            logger.warning("'%s' does not contain a 'url' field.", job)
-        job['direct_url'] = direct_url
-        yield job
+def add_raw_content(job:dict, session:requests.Session) -> dict:
+    """
+    :return: a string representing the page fetched from the URL (hopefully 
+             with information about the job) or None if url is None.
+    :raise: HTTPError for the obvious reasons.
+    """
+    try:
+        logger.info("Processing job '%s' (%s)...", job.get("raw_title"), job.get("url"))
+        response = session.get(str(job.get("url")))
+        response.raise_for_status()
 
-for job in resolve_job_urls(json.load(sys.stdin.buffer)):
-    pprint(job)
-    print('='*120)
+        job["raw_content"] = response.content.decode(
+            encoding=response.encoding or 'utf-8')
+        logger.info("\tadded %d bytes to raw_content.", len(job["raw_content"]))
+    except HTTPError as e:
+        job["errors"] = job.get("errors", []).append(str(e))
+        logger.warning(
+            "'%s' while trying to enrich job '%s' (%s).",
+            str(e), job.get("raw_title", "No Title"), job.get("url", "No URL")
+        )
+    return job
+
+session = requests.Session()
+jobs = [add_raw_content(job, session) for job in json.load(sys.stdin.buffer)]
+
+json.dump(obj=jobs, fp=sys.stdout)
