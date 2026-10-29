@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Extractor with STDIN Sample",
+            "name": "Extractor with single STDIN sample",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/european_remote/extractor.py",
@@ -19,6 +19,14 @@
             "program": "${workspaceFolder}/src/european_remote/fetcher.py",
             "console": "integratedTerminal",
             "args": ["<", "${workspaceFolder}/sample.json"],
+        },
+        {
+            "name": "Enricher with STDIN Sample",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/european_remote/job_ad_extractor.py",
+            "console": "integratedTerminal",
+            "args": ["<", "${workspaceFolder}/2026-10-09.json"],
         }
     ]
 }
