@@ -6,13 +6,13 @@ import json
 
 from bs4 import BeautifulSoup
 
-m:email.message.Message = email.message_from_binary_file(sys.stdin.buffer)
+message: email.message.Message = email.message_from_binary_file(sys.stdin.buffer)
 
-if m.is_multipart():
+if message.is_multipart():
     raise ValueError("Multi-Part Mime messages not supported")
 
-payload = bytes(m.get_payload(decode=True)
-                ).decode(encoding=m.get_content_charset() or "utf-8")
+payload = bytes(message.get_payload(decode=True)
+                ).decode(encoding=message.get_content_charset() or "utf-8")
 
 soup = BeautifulSoup(payload, "html.parser")
 
@@ -21,9 +21,9 @@ employer_re = re.compile(r'\(at (?P<employer>[^\)]+)\)')
 jobs = [
     {
         "url": link['href'],
-        "raw_title": link.span.string,
+        "raw_title": str(link.span.string or ""),
         "raw_employer": (
-            raw_employer := link.span.next_sibling.next_sibling.string
+            raw_employer := str(link.span.next_sibling.next_sibling.string) or ""
         ),
         "employer": (
             mo.group("employer")
