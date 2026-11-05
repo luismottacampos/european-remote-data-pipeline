@@ -31,6 +31,7 @@ dependencies = [
   "langchain-mistralai",
   "python-dotenv >= 1.2.4",
   "markdown >= 3.11",
+  "pyarrow >= 26.0",
 ]
 
 [project.urls]
@@ -39,9 +40,9 @@ Issues = "https://github.com/luismottacampos/european-remote/issues"
 Source = "https://github.com/luismottacampos/european-remote"
 
 [tool.hatch.envs.default.scripts]
-extractor = "python src/european_remote/extractor.py"
-fetcher = "python src/european_remote/fetcher.py"
-job_ad_extractor = "python src/european_remote/job_ad_extractor.py"
+extractor = "python -m european_remote.extractor"
+fetcher = "python -m european_remote.fetcher"
+job_ad_extractor = "python -m european_remote.job_ad_extractor"
 
 [tool.hatch.envs.types]
 extra-dependencies = [

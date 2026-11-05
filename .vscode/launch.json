@@ -5,17 +5,24 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Extractor with single STDIN sample",
+            "name": "Extractor",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/european_remote/extractor.py",
-            "console": "integratedTerminal",
-            "args": ["<", "${workspaceFolder}/sample.eml"],
+            "python": "${command:hatch.envInterpreter}",
+            "module": "european_remote.extractor",
+            "args": [
+                "-vvv",
+                "data/emails/2026-10-09.sample.eml",
+                "data/emails/2026-10-16.sample.eml",
+                "data/emails/2026-10-23.sample.eml",
+                "data/emails/2026-10-30.sample.eml"
+            ],
         },
         {
             "name": "Fetcher with STDIN Sample",
             "type": "debugpy",
             "request": "launch",
+            "python": "${command:hatch.envInterpreter}",
             "program": "${workspaceFolder}/src/european_remote/fetcher.py",
             "console": "integratedTerminal",
             "args": ["<", "${workspaceFolder}/sample.json"],
@@ -24,6 +31,7 @@
             "name": "Enricher with STDIN Sample",
             "type": "debugpy",
             "request": "launch",
+            "python": "${command:hatch.envInterpreter}",
             "program": "${workspaceFolder}/src/european_remote/job_ad_extractor.py",
             "console": "integratedTerminal",
             "args": ["<", "${workspaceFolder}/2026-10-09.json"],
