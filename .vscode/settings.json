@@ -1,6 +1,6 @@
 {
-    "python.analysis.autoImportCompletions": true,
 
+    "python.analysis.autoImportCompletions": false,
     "python-envs.defaultEnvManager": "pypa.hatch:hatch",
 
     "black-formatter.importStrategy": "fromEnvironment",
@@ -17,4 +17,11 @@
     "flake8.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/flake8"],
     "flake8.interpreter": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/python"],
     "flake8.args": ["--max-line-length=120"],
+    "[python]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.defaultColorDecorators": "never",
+        "editor.formatOnType": true,
+        "editor.wordBasedSuggestions": "off",
+        "editor.rulers": [120]
+    },
 }
