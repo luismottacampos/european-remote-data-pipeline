@@ -4,24 +4,25 @@
     "python-envs.defaultEnvManager": "pypa.hatch:hatch",
 
     "black-formatter.importStrategy": "fromEnvironment",
-    "black-formatter.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/black"],
+    "black-formatter.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/black"],
 
     "mypy-type-checker.importStrategy": "fromEnvironment",
-    "mypy-type-checker.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/mypy"],
+    "mypy-type-checker.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/mypy"],
 
     "autopep8.importStrategy": "fromEnvironment",
-    "autopep8.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/autopep8"],
-    "autopep8.interpreter": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/python"],
+    "autopep8.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/autopep8"],
+    "autopep8.interpreter": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/python"],
 
     "flake8.importStrategy": "fromEnvironment",
-    "flake8.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/flake8"],
-    "flake8.interpreter": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/Pk2eZrsh/lint/bin/python"],
+    "flake8.path": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/flake8"],
+    "flake8.interpreter": ["/Users/lmc/Library/Application Support/hatch/env/virtual/european-remote/0wXYKtnC/lint/bin/python"],
     "flake8.args": ["--max-line-length=120"],
     "[python]": {
         "diffEditor.ignoreTrimWhitespace": false,
-        "editor.defaultColorDecorators": "never",
+        "editor.defaultColorDecorators": "auto",
         "editor.formatOnType": true,
         "editor.wordBasedSuggestions": "off",
         "editor.rulers": [120]
     },
+    "python-envs.defaultPackageManager": "ms-python.python:pip",
 }

@@ -5,22 +5,27 @@ build-backend = "hatchling.build"
 [project]
 name = "european-remote"
 version = "0.0.1"
-description = 'European Remote Email Extractor'
+description = 'European Remote Data Pipeline'
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
-keywords = []
+keywords = [
+  "european-remote",
+  "data-pipeline",
+  "toy-data-pipeline",
+  "apache-parquet",
+  "pyarrow",
+  "llm-data-extraction"
+]
 authors = [
   { name = "Luis Motta Campos", email = "1871839+luismottacampos@users.noreply.github.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
+  "Programming Language :: Python :: 3.16",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
@@ -35,9 +40,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/luismottacampos/european-remote#readme"
-Issues = "https://github.com/luismottacampos/european-remote/issues"
-Source = "https://github.com/luismottacampos/european-remote"
+Documentation = "https://github.com/luismottacampos/european-remote-data-pipeline#readme"
+Issues = "https://github.com/luismottacampos/european-remote-data-pipeline/issues"
+Source = "https://github.com/luismottacampos/european-remote-data-pipeline"
 
 [tool.hatch.envs.default.scripts]
 extractor = "python -m european_remote.extractor {args}"
