@@ -41,7 +41,7 @@ Source = "https://github.com/luismottacampos/european-remote"
 
 [tool.hatch.envs.default.scripts]
 extractor = "python -m european_remote.extractor {args}"
-fetcher = "python -m european_remote.fetcher"
+fetcher = "python -m european_remote.fetcher {args}"
 job_ad_extractor = "python -m european_remote.job_ad_extractor"
 
 [tool.hatch.envs.types]

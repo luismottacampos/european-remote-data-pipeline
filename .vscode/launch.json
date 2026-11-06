@@ -19,13 +19,12 @@
             ],
         },
         {
-            "name": "Fetcher with STDIN Sample",
+            "name": "Fetcher",
             "type": "debugpy",
             "request": "launch",
             "python": "${command:hatch.envInterpreter}",
-            "program": "${workspaceFolder}/src/european_remote/fetcher.py",
-            "console": "integratedTerminal",
-            "args": ["<", "${workspaceFolder}/sample.json"],
+            "module": "european_remote.fetcher",
+            "args": ["-vvv"],
         },
         {
             "name": "Enricher with STDIN Sample",
