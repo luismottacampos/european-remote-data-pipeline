@@ -40,7 +40,7 @@ Issues = "https://github.com/luismottacampos/european-remote/issues"
 Source = "https://github.com/luismottacampos/european-remote"
 
 [tool.hatch.envs.default.scripts]
-extractor = "python -m european_remote.extractor"
+extractor = "python -m european_remote.extractor {args}"
 fetcher = "python -m european_remote.fetcher"
 job_ad_extractor = "python -m european_remote.job_ad_extractor"
 

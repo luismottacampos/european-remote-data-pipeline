@@ -6,19 +6,19 @@ import os
 import pyarrow as pa
 import pyarrow.parquet as parquet
 import re
-import sys
 import uuid
 
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
 from .schema import JOB_DATA_SCHEMA
+from .toolbox import configure_logging
 
 
 EMPLOYER_RE = re.compile(r'\(at (?P<employer>[^\)]+)\)')
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Ditto"""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -61,13 +61,7 @@ def build_job(link) -> dict:
 def main():
     """Where everything happens"""
     args = parse_arguments()
-
-    # Configure logging
-    logging.basicConfig(
-        level=[logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbose, 3)],
-        format='%(asctime)s %(levelname)s: %(message)s',
-        stream=sys.stderr
-    )
+    configure_logging(verbosity=args.verbose)
 
     logger = logging.getLogger()
 
