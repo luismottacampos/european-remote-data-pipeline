@@ -3,16 +3,12 @@ import logging
 import requests
 import time
 import pyarrow as pa
-import pyarrow.dataset as ds
 import os
 
 from pyarrow import parquet
 from random import uniform
-from requests import HTTPError
 from datetime import datetime
-from .schema import JOB_DATA_SCHEMA
-from .toolbox import configure_logging
-from typing import Any
+from .toolbox import configure_logging, read_data_from
 
 
 HEADERS = {
@@ -34,74 +30,76 @@ def parse_arguments() -> argparse.Namespace:
         help='Each occurrence increments log verbosity from ERROR (default) to DEBUG.'
     )
     parser.add_argument(
-        '--input', '-i', type=str, default='data/extracted',
-        help='The folder storing data extracted from the emails. Defaults to "./data/extracted".'
+        '--input', '-i', type=str, default='data/jobs',
+        help='The folder storing data extracted from the emails. Defaults to "./data/jobs".'
     )
     parser.add_argument(
-        '--output', '-o', type=str, default='data/with_description',
-        help='The folder to be used for jobs enriched with descriptions. Defaults to "./data/with_description".'
+        '--output', '-o', type=str, default='data/jobs',
+        help='The folder to be used for jobs enriched with descriptions. Defaults to "./data/jobs".'
     )
     return parser.parse_args()
 
 
-def add_raw_content(job: dict, session: requests.Session) -> None:
+def add_raw_content(job: dict, session: requests.Session) -> int:
     """
     Adds raw contents retrieved from job['url'] to the given job dictionary.
+    :return: 1 if the job contents were succesfully retrieved from the publisher, 0 otherwise.
     """
     logger = logging.getLogger()
+    outcome = 0
     try:
         logger.info("Attempting to retrieve raw content for job '%s'", job['id'])
         response = session.get(job['url'], timeout=10)
         response.raise_for_status()
 
-        job["raw_content"] = response.content.decode(encoding=response.encoding or 'utf-8')
-        logger.info("Job '%s' now has %d bytes of raw_content.", job['id'], len(job['raw_content']))
-    except HTTPError as e:
-        job["errors"] = (job.get("errors") or []) + [str(e)]
-        logger.warning(
-            "'%s' while trying to enrich job '%s' (%s).",
-            str(e), job.get("raw_title", "No Title"), job.get("url", "No URL")
-        )
-    except requests.exceptions.RequestException as e:
-        # Catches: ConnectionError, Timeout, TooManyRedirects, SSLError, etc.
-        job["errors"] = (job.get("errors") or []) + [str(e)]
-        logger.error("Request failed for '%s': %s", job.get("url", "No URL"), str(e))
+        job['raw_content'] = response.content.decode(encoding=response.encoding or 'utf-8')
+        job['last_fetch_attempt'] = datetime.now()
+        job['fetch_status'] = 'success'
+        job['last_fetch_status_code'] = response.status_code
+        job['last_fetch_reason'] = response.reason
+        job['content_length'] = int(response.headers.get('Content-Length') or len(job['raw_content']))
+        logger.info("Job '%s' now has %d bytes of raw_content.", job['id'], job['content_length'])
+        outcome = 1
+
+    except (requests.HTTPError, requests.RequestException) as e:
+        match e:
+            case requests.HTTPError(
+                response=requests.Response(status_code=status_code, url=url, reason=reason, headers=headers)
+            ):
+                job['last_fetch_attempt'] = datetime.now()
+                match status_code:
+                    case 404, 410:
+                        job['fetch_status'] = 'gone'
+                    case 403:
+                        job['fetch_status'] = 'throttled'
+                    case _:
+                        job['fetch_status'] = 'error'
+                job['last_fetch_status_code'] = status_code
+                job['last_fetch_reason'] = reason
+                job['content_length'] = int(headers.get('Content-Length') or -1)
+                logger.warning("Got 'HTTP/%s - %s' while fetching '%s' to enrich job '%s'.",
+                               status_code, reason, url, job['id'])
+            case _:
+                job['last_fetch_attempt'] = datetime.now()
+                job['fetch_status'] = 'error'
+                job['last_fetch_status_code'] = getattr(e.response, 'status_code', None)
+                job['last_fetch_reason'] = getattr(e.response, 'reason', 'Unknown Reason')
+                job['content_length'] = None
+                logger.error(
+                    "Job %s: fetching '%s' failed: 'HTTP/%s - %s'.",
+                    job['id'], getattr(e.response, 'url', 'Unknown URL'),
+                    job['last_fetch_status_code'], job['last_fetch_reason']
+                )
+
     except UnicodeDecodeError as e:
-        job["errors"] = (job.get("errors") or []) + [str(e)]
-        logger.error("Failed to decode content from '%s': %s", job.get("url", "No URL"), str(e))
+        job['last_fetch_attempt'] = datetime.now()
+        job['fetch_status'] = 'error'
+        job['last_fetch_status_code'] = None
+        job['last_fetch_reason'] = None
+        job['content_length'] = None
+        logger.error("Got '%s' while attempting to decode retrieved contents for job '%s'.", e, job['id'])
 
-
-def _gather_parquet_files(table_dir: str) -> list[str]:
-    """Gather all parquet files from the given directory."""
-    logger = logging.getLogger()
-
-    logger.debug('Attempting to read data from "%s"', table_dir)
-    files = [
-        os.path.join(table_dir, f)
-        for f in os.listdir(table_dir)
-        if f.endswith('.parquet')
-    ]
-    logger.info('Found %d parquet files in "%s".', len(files), table_dir)
-
-    if not files:
-        logger.warning('No parquet files found in "%s".', table_dir)
-        raise FileNotFoundError('No parquet files found in "%s".', table_dir)
-
-    return files
-
-
-def _read_data_from(table_dir: str, filters=ds.field('raw_content').is_null()) -> list[dict[str, Any]]:
-    """
-    Read Parquet tables as a python list
-    :param: table_dir: a directory where to find partial parquet files for the table.
-    :param: filters: Filters passed straight to pyarrow.parquet.read_table().
-    :return: a list of dictionaries representing the job records as defined in schema.py.
-    """
-    input_files = _gather_parquet_files(table_dir)
-    combined = pa.concat_tables(
-        parquet.read_table(file, schema=JOB_DATA_SCHEMA, filters=filters) for file in input_files
-    )
-    return combined.to_pylist()
+    return outcome
 
 
 def main() -> None:
@@ -114,22 +112,27 @@ def main() -> None:
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    jobs = _read_data_from(args.input)
+    jobs = read_data_from(args.input)
 
+    all_jobs, enriched_jobs = 0, 0
     for job in jobs:
-        add_raw_content(job, session)
+        all_jobs += 1
+        if job.get('fetch_status', 'not_fetched') in ('success', 'gone'):
+            continue
+
+        enriched_jobs += add_raw_content(job, session)
         # rate limiting with a random component ensures ATSs still allow us through.
         time.sleep(uniform(0.5, 2.0))
 
+    logger.info("Enriched %d out of %d processed jobs.", enriched_jobs, all_jobs)
+
+    # Delegate accessing cloud resources to PyArrow.
     if '://' not in args.output:
         # Avoid silly things like writing to non-existent dirs.
-        # Delegate accessing cloud resources to PyArrow.
         os.makedirs(args.output, exist_ok=True)
 
-    output_file = os.path.join(args.output, f"part-{int(datetime.now().timestamp())}.parquet")
-    logger.info('Writing enriched jobs to "%s"', output_file)
-    output_table = pa.Table.from_pylist(jobs, schema=JOB_DATA_SCHEMA)
-    parquet.write_table(output_table, output_file)
+    parquet.write_table(table=pa.Table.from_pylist(jobs), where=os.path.join(args.output, "jobs.parquet"))
+    logger.info('Wrote %s jobs to file.', all_jobs)
 
 
 if __name__ == '__main__':

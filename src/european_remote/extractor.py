@@ -1,5 +1,6 @@
 import argparse
-import email.message
+import email
+import email.utils
 import hashlib
 import logging
 import os
@@ -11,8 +12,7 @@ import uuid
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
-from .schema import JOB_DATA_SCHEMA
-from .toolbox import configure_logging
+from .toolbox import configure_logging, read_data_from
 
 
 EMPLOYER_RE = re.compile(r'\(at (?P<employer>[^\)]+)\)')
@@ -26,8 +26,8 @@ def parse_arguments() -> argparse.Namespace:
         help='Each occurrence increments log verbosity from ERROR (default) to DEBUG.'
     )
     parser.add_argument(
-        '--output', type=str, default='data/extracted',
-        help='The folder to be used for data extracted from the emails. Defaults to "./data/extracted".'
+        '--output', type=str, default='data/jobs',
+        help='The folder containing all the parquet data-files. Defaults to "data/jobs".'
     )
     parser.add_argument('files', nargs='+', help='Email files')
     return parser.parse_args()
@@ -42,7 +42,7 @@ def normalise_url(url: str) -> str:
     return urlunparse(parsed._replace(query='', fragment='', path=parsed.path.rstrip('/')))
 
 
-def build_job(link) -> dict:
+def build_job(link, published_at) -> dict:
     """Builds a job from the given bs4 Tag"""
     return {
         "id": str(uuid.uuid4()),
@@ -55,6 +55,7 @@ def build_job(link) -> dict:
             if (mo := EMPLOYER_RE.search(raw_employer))
             else None
         ),
+        "published_at": published_at,
     }
 
 
@@ -65,12 +66,15 @@ def main():
 
     logger = logging.getLogger()
 
-    jobs = []
+    jobs: list = read_data_from(args.output)
+    existing_url_hashes: set = {job['url_hash'] for job in jobs}
 
     for file in args.files:
         logger.info('Processing "%s"', file)
 
-        message: email.message.Message = email.message_from_binary_file(open(file, 'rb'))
+        message = email.message_from_binary_file(open(file, 'rb'))
+        date_tuple = email.utils.parsedate_tz(message['Date'])
+        published_at = datetime.fromtimestamp(email.utils.mktime_tz(date_tuple)) if date_tuple else None
 
         if message.is_multipart():
             logger.warning('Ignoring unsupported RFC 5322 multipart message in "%s"', file)
@@ -80,18 +84,20 @@ def main():
         logger.info('Message in "%s" contains a payload of %d bytes', file, len(payload))
 
         soup = BeautifulSoup(payload, "html.parser")
-        jobs += [build_job(link) for link in soup.css.select("li a")]
+        jobs += filter(
+            lambda j: j['url_hash'] not in existing_url_hashes,
+            [build_job(link, published_at) for link in soup.css.select("li a")]
+        )
 
     if '://' not in args.output:
         # Avoid silly things like writing to non-existent dirs.
         # Delegate accessing cloud resources to PyArrow.
         os.makedirs(args.output, exist_ok=True)
 
-    # Using partial files here is definitively, totally overkill. :D
-    filename = os.path.join(args.output, f"part-{int(datetime.now().timestamp())}.parquet")
-    logger.info("Writing extracted jobs to '%s'.", filename)
-    table = pa.Table.from_pylist(jobs, schema=JOB_DATA_SCHEMA)
-    parquet.write_table(table, where=filename)
+    parquet.write_table(
+        table=pa.Table.from_pylist(jobs),
+        where=os.path.join(args.output, "jobs.parquet")
+    )
 
 
 if __name__ == '__main__':
