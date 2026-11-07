@@ -68,7 +68,7 @@ def add_raw_content(job: dict, session: requests.Session) -> int:
             ):
                 job['last_fetch_attempt'] = datetime.now()
                 match status_code:
-                    case 404, 410:
+                    case 404 | 410:
                         job['fetch_status'] = 'gone'
                     case 403:
                         job['fetch_status'] = 'throttled'
