@@ -41,65 +41,53 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def add_raw_content(job: dict, session: requests.Session) -> int:
-    """
-    Adds raw contents retrieved from job['url'] to the given job dictionary.
-    :return: 1 if the job contents were succesfully retrieved from the publisher, 0 otherwise.
+    """Adds raw contents retrieved from job['url'] to the given job dictionary.
+
+    Returns 1 if successful, 0 otherwise.
     """
     logger = logging.getLogger()
-    outcome = 0
-    try:
-        logger.info("Attempting to retrieve raw content for job '%s'", job['id'])
-        response = session.get(job['url'], timeout=10)
-        response.raise_for_status()
+    job['last_fetch_attempt'] = datetime.now()
 
-        job['raw_content'] = response.content.decode(encoding=response.encoding or 'utf-8')
-        job['last_fetch_attempt'] = datetime.now()
-        job['fetch_status'] = 'success'
+    # Map special status codes to fetch_status values
+    STATUS_MAP = {403: 'throttled', 404: 'gone', 410: 'gone'}
+
+    try:
+        response = session.get(job['url'], timeout=10)
         job['last_fetch_status_code'] = response.status_code
         job['last_fetch_reason'] = response.reason
-        job['content_length'] = int(response.headers.get('Content-Length') or len(job['raw_content']))
-        logger.info("Job '%s' now has %d bytes of raw_content.", job['id'], job['content_length'])
-        outcome = 1
 
-    except (requests.HTTPError, requests.RequestException) as e:
-        match e:
-            case requests.HTTPError(
-                response=requests.Response(status_code=status_code, url=url, reason=reason, headers=headers)
-            ):
-                job['last_fetch_attempt'] = datetime.now()
-                match status_code:
-                    case 404 | 410:
-                        job['fetch_status'] = 'gone'
-                    case 403:
-                        job['fetch_status'] = 'throttled'
-                    case _:
-                        job['fetch_status'] = 'error'
-                job['last_fetch_status_code'] = status_code
-                job['last_fetch_reason'] = reason
-                job['content_length'] = int(headers.get('Content-Length') or -1)
-                logger.warning("Got 'HTTP/%s - %s' while fetching '%s' to enrich job '%s'.",
-                               status_code, reason, url, job['id'])
-            case _:
-                job['last_fetch_attempt'] = datetime.now()
+        if response.status_code == 200:
+            try:
+                job['raw_content'] = response.content.decode(encoding=response.encoding or 'utf-8')
+                job['fetch_status'] = 'success'
+                content_len = response.headers.get('Content-Length')
+                job['content_length'] = int(content_len) if content_len else len(job['raw_content'])
+                logger.info("Added %s bytes of raw content to job '%s'.",
+                           job['content_length'], job['id'])
+                return 1
+            except UnicodeDecodeError as e:
                 job['fetch_status'] = 'error'
-                job['last_fetch_status_code'] = getattr(e.response, 'status_code', None)
-                job['last_fetch_reason'] = getattr(e.response, 'reason', 'Unknown Reason')
                 job['content_length'] = None
-                logger.error(
-                    "Job %s: fetching '%s' failed: 'HTTP/%s - %s'.",
-                    job['id'], getattr(e.response, 'url', 'Unknown URL'),
-                    job['last_fetch_status_code'], job['last_fetch_reason']
-                )
+                logger.error("Got '%s' while decoding contents for job '%s'.", e, job['id'])
+                return 0
 
-    except UnicodeDecodeError as e:
-        job['last_fetch_attempt'] = datetime.now()
+        # All non-200 HTTP status codes
+        job['fetch_status'] = STATUS_MAP.get(response.status_code, 'error')
+        content_len = response.headers.get('Content-Length')
+        job['content_length'] = int(content_len) if content_len else -1
+        logger.warning("Got %s - %s while fetching from '%s' for job '%s'.",
+                      response.status_code, response.reason, response.url, job['id'])
+        return 0
+
+    except requests.RequestException as e:
         job['fetch_status'] = 'error'
-        job['last_fetch_status_code'] = None
-        job['last_fetch_reason'] = None
+        job['last_fetch_status_code'] = getattr(e.response, 'status_code', None)
+        job['last_fetch_reason'] = getattr(e.response, 'reason', 'Unknown Reason')
         job['content_length'] = None
-        logger.error("Got '%s' while attempting to decode retrieved contents for job '%s'.", e, job['id'])
-
-    return outcome
+        req = getattr(e, 'request', None)
+        url = req.url if req and hasattr(req, 'url') else 'Unknown URL'
+        logger.error("Job %s: network error fetching '%s': %s", job['id'], url, str(e))
+        return 0
 
 
 def main() -> None:
