@@ -55,22 +55,32 @@ class GenericJobAdExtractor:
         """
         The actual extractor.
         :return: a dictionary representing the parsed data.
+        :raises httpx.HTTPStatusError: if all retry attempts fail
         """
         attempts = range(3)
         for attempt in attempts:
             try:
                 return self.model.invoke(self.PROMPT_TEMPLATE.format(content=content))
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 503 and attempt < 2:
-                    duration = 2 ** attempt + random.random()
+                if e.response.status_code == 503:
+                    if attempt < len(attempts) - 1:
+                        duration = 2 ** attempt + random.random()
+                        logging.getLogger().warning(
+                            "Received HTTP/503 from the model API. Attempt %d/%d. Retrying in %.1fs...",
+                            attempt + 1, len(attempts), duration
+                        )
+                        time.sleep(duration)
+                        continue
                     logging.getLogger().warning(
-                        "Received HTTP/503 from the model API. Attempt %d/%d. Sleeping for %d seconds.",
-                        attempt, len(attempts), duration)
-                    time.sleep(duration)
-                    continue
-            logging.getLogger().warning("Giving up after %d consecutive HTTP/503 errors from the model API.",
-                                        len(attempts))
-            # FIXME raise an exception here; don't fall for the LLM misguidance: there's no exception to re-raise here.
+                        "Giving up extraction after %d attempts. Last error: HTTP 503.",
+                        len(attempts)
+                    )
+                else:
+                    logging.getLogger().warning(
+                        "Extraction failed with HTTP %d.",
+                        e.response.status_code
+                    )
+                raise
 
 
 def _cleanup_html(content: str) -> str:
@@ -133,13 +143,11 @@ def main() -> None:
             )
             continue
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 503:
-                logger.warning(
-                    "Multiple extraction attempts for job #%d '%s' (%s) failed with HTTP/503. Giving up.",
-                    i, job.get("raw_title"), job.get("url")
-                )
-                continue
-            raise
+            logger.warning(
+                "Job #%d '%s' (%s): Extraction failed with HTTP %d.",
+                i, job.get("raw_title"), job.get("url"), e.response.status_code
+            )
+            continue
         logger.info("Successfully extracted %d bytes of information from job #%d.", len(str(jobs[i]["content"])), i)
 
         duration = time.perf_counter() - start
