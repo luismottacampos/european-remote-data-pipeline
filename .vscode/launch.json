@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Extractor",
+            "name": "1:Email Extractor",
             "type": "debugpy",
             "request": "launch",
             "python": "${command:hatch.envInterpreter}",
@@ -19,7 +19,7 @@
             ],
         },
         {
-            "name": "Fetcher",
+            "name": "2:Job Content Fetcher",
             "type": "debugpy",
             "request": "launch",
             "python": "${command:hatch.envInterpreter}",
@@ -27,13 +27,12 @@
             "args": ["-vvv"],
         },
         {
-            "name": "Enricher with STDIN Sample",
+            "name": "3:Structured Job Data Extractor",
             "type": "debugpy",
             "request": "launch",
             "python": "${command:hatch.envInterpreter}",
-            "program": "${workspaceFolder}/src/european_remote/job_ad_extractor.py",
-            "console": "integratedTerminal",
-            "args": ["<", "${workspaceFolder}/2026-10-09.json"],
+            "module": "european_remote.job_ad_extractor",
+            "args": ["-vvv"],
         }
     ]
 }

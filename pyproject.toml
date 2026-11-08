@@ -47,7 +47,7 @@ Source = "https://github.com/luismottacampos/european-remote-data-pipeline"
 [tool.hatch.envs.default.scripts]
 extractor = "python -m european_remote.extractor {args}"
 fetcher = "python -m european_remote.fetcher {args}"
-job_ad_extractor = "python -m european_remote.job_ad_extractor"
+job_ad_extractor = "python -m european_remote.job_ad_extractor {args}"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
