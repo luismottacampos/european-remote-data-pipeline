@@ -97,7 +97,7 @@ def main() -> None:
             clean_content = clean(job['raw_content'])
             logger.debug('CLEAN CONTENT SAMPLE ' + '=' * 29 + '\n%s\n' + '=' * 50, clean_content[:200])
 
-            job['content'] = extractor.extract(content=clean_content)
+            job['content'] = extractor.extract(content=clean_content).model_dump()
             job['extraction_status'] = 'success'
             enriched_jobs += 1
             logger.debug('EXTRACTED ' + '=' * 40 + '\n%s\n' + '=' * 50, job['content'])

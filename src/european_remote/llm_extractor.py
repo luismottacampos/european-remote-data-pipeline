@@ -6,6 +6,7 @@ import logging
 
 from .models import JobAdvertisement
 from langchain.chat_models import init_chat_model
+from typing import cast
 
 
 class GenericJobAdExtractor:
@@ -33,7 +34,7 @@ class GenericJobAdExtractor:
             temperature=self.temperature,
         ).with_structured_output(JobAdvertisement)
 
-    def extract(self, content: str):
+    def extract(self, content: str) -> JobAdvertisement:
         """
         The actual extractor.
         :return: a dictionary representing the parsed data.
@@ -43,7 +44,7 @@ class GenericJobAdExtractor:
         attempts = range(3)
         for attempt in attempts:
             try:
-                return self.model.invoke(self.PROMPT_TEMPLATE.format(content=content))
+                return cast(JobAdvertisement, self.model.invoke(self.PROMPT_TEMPLATE.format(content=content)))
             except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
                 is_retriable = isinstance(e, httpx.TimeoutException) or (
                     isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 503
@@ -64,3 +65,5 @@ class GenericJobAdExtractor:
 
                 logger.warning("Giving up after %d attempts.", len(attempts))
                 raise
+
+        raise RuntimeError("Unexpected end of extract() - should never be reached")
