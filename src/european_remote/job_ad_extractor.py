@@ -10,6 +10,20 @@ from .llm_extractor import GenericJobAdExtractor
 from .toolbox import configure_logging, read_data_from
 from pyarrow import parquet as pq
 from pydantic import ValidationError
+from bs4 import BeautifulSoup
+
+
+def positive_int(value: str) -> int:
+    """Validate that the value is a positive integer."""
+    try:
+        num = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'"{value}" is not a valid integer')
+
+    if num <= 0:
+        raise argparse.ArgumentTypeError(f'"{value}" must be greater than zero')
+
+    return num
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -27,7 +41,14 @@ def parse_arguments() -> argparse.Namespace:
         '--output', '-o', type=str, default='data/jobs',
         help='The folder to be used for jobs enriched with extracted content. Defaults to "./data/jobs".'
     )
+    parser.add_argument('--dry-run', action='store_true', help='Run without making changes')
+    parser.add_argument('--limit', '-l', type=positive_int, default=None,
+                        help='The maximum number of records to process.')
     return parser.parse_args()
+
+
+def clean(content: str) -> str:
+    return BeautifulSoup(content, 'html.parser').get_text()
 
 
 def main() -> None:
@@ -48,11 +69,18 @@ def main() -> None:
         logger.critical(msg=str(e))
         raise
 
-    jobs = read_data_from(args.input)
-    logger.info("Read %d jobs from input.", len(jobs))
+    records = read_data_from(args.input)
+    record_count = len(records)
+
+    logger.info("Read %d jobs from input.", record_count)
+    if args.limit and args.limit >= record_count:
+        logger.info('Willing to process up to %s jobs.', args.limit)
 
     enriched_jobs = 0
-    for job in jobs:
+    for job in records:
+        if args.limit and enriched_jobs >= args.limit:
+            break
+
         # Skip jobs without raw_content or already processed
         if not job.get('raw_content') or job.get('extraction_status') == 'success':
             continue
@@ -63,9 +91,16 @@ def main() -> None:
 
         job['extraction_status'] = 'error'
         try:
-            job['content'] = extractor.extract(content=job['raw_content'])
+            logger.debug("Job '%s' has %s bytes of raw content.", job['id'], job['content_length'])
+
+            logger.debug('RAW CONTENT SAMPLE ' + '=' * 31 + '\n%s\n' + '=' * 50, job['raw_content'][:200])
+            clean_content = clean(job['raw_content'])
+            logger.debug('CLEAN CONTENT SAMPLE ' + '=' * 29 + '\n%s\n' + '=' * 50, clean_content[:200])
+
+            job['content'] = extractor.extract(content=clean_content)
             job['extraction_status'] = 'success'
             enriched_jobs += 1
+            logger.debug('EXTRACTED ' + '=' * 40 + '\n%s\n' + '=' * 50, job['content'])
             logger.info(
                 "Successfully extracted %d bytes of information from job '%s'.",
                 len(str(job["content"])), job_id
@@ -89,17 +124,26 @@ def main() -> None:
             job_id, job.get('url'), duration, extractor.model_name
         )
 
-    logger.info("Enriched %d out of %d processed jobs.", enriched_jobs, len(jobs))
+    if args.limit:
+        logger.info(
+            "Enriched %d out of %d processed jobs, respecting the imposed limit of %d jobs.",
+            enriched_jobs, record_count, args.limit
+        )
+    else:
+        logger.info("Enriched %d out of %d processed jobs.", enriched_jobs, record_count)
 
     # Write output
     if '://' not in args.output:
         os.makedirs(args.output, exist_ok=True)
 
-    pq.write_table(
-        table=pa.Table.from_pylist(jobs),
-        where=os.path.join(args.output, "jobs.parquet")
-    )
-    logger.info('Wrote %s jobs to file.', len(jobs))
+    if args.dry_run:
+        logger.warning('Would have written "%s".', os.path.join(args.output, "jobs.parquet"))
+    else:
+        pq.write_table(
+            table=pa.Table.from_pylist(records),
+            where=os.path.join(args.output, "jobs.parquet")
+        )
+        logger.info('Wrote %s jobs to file.', len(records))
 
 
 if __name__ == '__main__':

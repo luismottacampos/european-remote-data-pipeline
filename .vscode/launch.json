@@ -32,7 +32,7 @@
             "request": "launch",
             "python": "${command:hatch.envInterpreter}",
             "module": "european_remote.job_ad_extractor",
-            "args": ["-vvv"],
+            "args": ["--dry-run", "-vvv", "-l", "10"],
         }
     ]
 }
